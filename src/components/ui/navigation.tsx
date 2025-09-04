@@ -1,8 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './button';
 import { motion } from 'framer-motion';
+import { supabase } from '@/integrations/supabase/client';
+import { User, Session } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const Navigation = () => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error('حدث خطأ في تسجيل الخروج');
+    } else {
+      toast.success('تم تسجيل الخروج بنجاح');
+      navigate('/');
+    }
+  };
+
   return (
     <motion.nav 
       initial={{ opacity: 0, y: -20 }}
@@ -38,12 +74,25 @@ const Navigation = () => {
 
           {/* Action Buttons */}
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm">
-              Sign In
-            </Button>
-            <Button variant="primary" size="sm" className="glow-border">
-              Get Started
-            </Button>
+            {user ? (
+              <>
+                <span className="text-sm text-foreground/70">
+                  مرحباً، {user.email?.split('@')[0]}
+                </span>
+                <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                  تسجيل الخروج
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
+                  تسجيل الدخول
+                </Button>
+                <Button variant="primary" size="sm" className="glow-border" onClick={() => navigate('/auth')}>
+                  ابدأ الآن
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
